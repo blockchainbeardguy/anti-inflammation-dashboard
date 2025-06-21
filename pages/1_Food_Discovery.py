@@ -45,7 +45,7 @@ st.markdown("""
     }
     .stButton>button:active {
         transform: translateY(0);
-        box-shadow: none;
+        box_shadow: none;
     }
 
     /* Secondary button style (e.g., View Details, Reset) */
@@ -294,16 +294,14 @@ if filtered_df.empty:
 else:
     # Prepare DataFrame for display with custom columns and buttons
     # Using .get() for safety when accessing columns, providing N/A default for display
-    # The columns for the dataframe must exist in the dataframe itself.
-    # We will ensure all necessary columns are present, using .get() with default values
-    # if they happen to be entirely missing from the loaded CSV.
-
     # Ensure all required display columns exist in filtered_df, adding if missing
     for col in ['Food Item', 'Category', 'Key Vitamins & Minerals', 'Why Anti-Inflammatory',
                 'Best For', 'Score (0–10)', 'Sample Recipe/Usage', 'Cautions',
                 'Sub-category', 'Flags (Female Health Issues)']:
         if col not in filtered_df.columns:
-            filtered_df[col] = 'N/A (Column Missing)' # Add a placeholder column if not found
+            # If a column is missing, add it with a default value.
+            # This is a safeguard against slightly inconsistent CSVs.
+            filtered_df[col] = 'N/A (Column Missing)'
 
     display_df = filtered_df[[
         'Food Item',
@@ -313,12 +311,11 @@ else:
         'Best For', # Specific Benefit for Women
         'Score (0–10)',
         'Sample Recipe/Usage', # Used in the details or plan
-        'Cautions' # Used in the details
+        'Cautions', # Used in the details
+        'Sub-category', # Also used in details
+        'Flags (Female Health Issues)' # Also used in details
     ]].copy()
 
-    # Add dummy columns for action buttons which will trigger Streamlit's internal button handling
-    display_df['View Details'] = 'View Details'
-    display_df['Add to Plan'] = 'Add to Plan'
 
     # Display the DataFrame with column configurations
     st.dataframe(
@@ -356,9 +353,11 @@ else:
             "Add to Plan": st.column_config.ButtonColumn(
                 "Add to Plan", help="Add this food to your custom meal plan", width="small",
             ),
-            # Hide raw Sample Recipe/Usage and Cautions as they are shown in details modal
-            "Sample Recipe/Usage_hidden": None,
-            "Cautions_hidden": None
+            # Hide internal columns that are just for the DataFrame data but not displayed
+            "Sample Recipe/Usage": None,
+            "Cautions": None,
+            "Sub-category": None,
+            "Flags (Female Health Issues)": None
         },
         on_select="rerun", # Rerun the app when a selection is made
         selection_mode="single-row" # Only allow one selection at a time for button click
