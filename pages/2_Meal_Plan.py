@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
-import random # For randomizing meal plan suggestions
+import random
+import json # For parsing LLM response
+import requests # For making HTTP requests to LLM API
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="NourishWell: Meal Plan",
     layout="wide",
-    initial_sidebar_state="collapsed" # Sidebar not needed on meal plan page
+    initial_sidebar_state="collapsed" # No sidebar needed on meal plan page
 )
 
 # --- CUSTOM CSS FOR MODERN UI (Repeated for consistency across pages) ---
@@ -31,8 +33,8 @@ st.markdown("""
     .stButton>button {
         background-color: #0d9488; /* Teal-600 */
         color: white;
-        border-radius: 0.75rem; /* More rounded */
-        padding: 0.75rem 1.25rem; /* Standard padding */
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.25rem;
         font-weight: 600;
         transition: all 0.2s ease-in-out;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -63,100 +65,6 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* Food card specific styling (not directly used on this page, but kept for general app consistency) */
-    .food-card {
-        background-color: white;
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: all 0.2s ease-in-out;
-        margin-bottom: 1.5rem;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border: 1px solid #f0f4f8;
-    }
-    .food-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 15px rgba(0,0,0,0.1);
-    }
-    .food-card-score {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #0d9488;
-        text-align: right;
-        line-height: 1;
-    }
-    .food-card-name {
-        font-size: 1.625rem;
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 0.5rem;
-    }
-    .food-card-category {
-        font-size: 0.875rem;
-        color: #64748B;
-        margin-top: 0.25rem;
-        font-weight: 500;
-    }
-    .food-card-why {
-        font-size: 0.95rem;
-        color: #475569;
-        margin-top: 1rem;
-        flex-grow: 1;
-        line-height: 1.4;
-    }
-    .food-card-buttons {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.5rem;
-        justify-content: space-between;
-    }
-    .food-card-buttons button {
-        flex-grow: 1;
-    }
-
-    /* Detail Card styling (simulated modal) (not directly used on this page) */
-    .detail-card {
-        background-color: white;
-        border-radius: 0.75rem;
-        padding: 2.5rem;
-        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-        margin-top: 2rem;
-        border-left: 6px solid #0d9488;
-        margin-bottom: 2rem;
-    }
-    .detail-card h3 {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #0d9488;
-        margin-bottom: 1rem;
-    }
-    .detail-item-title {
-        font-weight: 600;
-        color: #1e293b;
-        margin-top: 1rem;
-        margin-bottom: 0.35rem;
-        font-size: 1.05rem;
-    }
-    .detail-item-content {
-        color: #475569;
-        line-height: 1.5;
-    }
-    .flag-badge {
-        display: inline-block;
-        background-color: #ECFDF5;
-        color: #047857;
-        padding: 0.3rem 0.9rem;
-        border-radius: 9999px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        margin-right: 0.6rem;
-        margin-bottom: 0.6rem;
-        border: 1px solid #10B981;
-    }
-
     /* Meal Plan Section styling for Meal Plan page */
     .meal-plan-section {
         background-color: white;
@@ -180,6 +88,11 @@ st.markdown("""
     .stMultiSelect, .stSlider {
         margin-bottom: 1rem;
     }
+    .stTextInput {
+        border-radius: 0.5rem;
+        border: 1px solid #E2E8F0;
+        background-color: #F8FAFC;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -194,26 +107,90 @@ def load_data():
 
 df = load_data()
 
-# --- SESSION STATE INITIALIZATION (Ensure consistency with Food Discovery) ---
+# --- SESSION STATE INITIALIZATION ---
 if 'selected_foods_for_plan' not in st.session_state:
     st.session_state.selected_foods_for_plan = []
-if 'generated_meal_plan' not in st.session_state:
-    st.session_state.generated_meal_plan = []
+if 'generated_meal_plan_llm' not in st.session_state: # Renamed to avoid conflict with previous simple plan
+    st.session_state.generated_meal_plan_llm = None
+
+
+# --- LLM API Call Function ---
+def get_gemini_meal_plan(selected_foods_df, api_key):
+    if not api_key:
+        st.error("API Key not found. Please set your Google API Key in Streamlit secrets.toml.")
+        return "Error: API Key not configured."
+
+    food_details_list = selected_foods_df.to_dict(orient='records')
+
+    # Constructing a detailed prompt for the LLM
+    prompt = f"""
+    You are an expert nutritionist specializing in anti-inflammatory diets for women's health.
+    Based ONLY on the following list of anti-inflammatory foods selected by the user, create a personalized one-day meal plan.
+    The meal plan should include Breakfast, Lunch, Dinner, and optionally 1-2 snacks.
+    For each meal, suggest a specific dish or usage idea that clearly incorporates 1-3 of the provided foods.
+    Briefly explain *why* the suggested meal is beneficial for women's anti-inflammatory needs, referencing the anti-inflammatory properties of the ingredients from the list.
+    Be creative and practical, using the 'Sample Recipe/Usage' column from the data where appropriate, but feel free to combine ideas.
+    Focus on balancing meals and ensuring they are genuinely anti-inflammatory.
+    The output should be in a clear, easy-to-read Markdown format.
+
+    Selected Anti-Inflammatory Foods (with their properties):
+    {json.dumps(food_details_list, indent=2)}
+
+    Please generate the meal plan:
+    """
+
+    headers = {
+        'Content-Type': 'application/json'
+    }
+    # Using gemini-2.0-flash as specified by general instructions
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.7, # Moderate creativity
+            "topK": 40,
+            "topP": 0.95,
+            "maxOutputTokens": 1500 # Sufficient length for a detailed plan
+        }
+    }
+
+    try:
+        response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        result = response.json()
+
+        if result and 'candidates' in result and result['candidates']:
+            generated_text = result['candidates'][0]['content']['parts'][0]['text']
+            return generated_text
+        else:
+            return "No meal plan could be generated by the AI at this time. Please try again or adjust your selected foods."
+    except requests.exceptions.RequestException as e:
+        return f"Error communicating with AI: {e}"
+    except json.JSONDecodeError:
+        return "Error: Could not decode AI response (invalid JSON)."
+    except KeyError:
+        return "Error: Unexpected AI response format."
 
 
 # --- HEADER ---
 st.title("🍽️ Your Custom Meal Plan")
-st.markdown("Review your selected foods and generate a personalized meal plan suggestion.")
+st.markdown("Review your selected foods and generate a personalized meal plan suggestion using AI.")
 
 # --- NAVIGATION BUTTONS ---
 nav_cols = st.columns(2)
 with nav_cols[0]:
-    st.page_link("pages/1_Food_Discovery.py", label="← Back to Food Discovery", icon="⬅️")
+    st.page_link("pages/1_Food_Discovery.py", label="← Back to Food Discovery", icon="⬅️", type="secondary")
 with nav_cols[1]:
     if st.button("Start Over (Clear All)", type="secondary", use_container_width=True):
         st.session_state.selected_foods_for_plan = []
-        st.session_state.generated_meal_plan = []
-        st.toast("Your plan has been reset!", icon="🗑️")
+        st.session_state.generated_meal_plan_llm = None
+        st.toast("Your plan has been reset! 👋", icon="🗑️")
         st.rerun()
 
 st.markdown("---") # Separator
@@ -224,110 +201,75 @@ if not st.session_state.selected_foods_for_plan:
 else:
     plan_df = df[df['Food Item'].isin(st.session_state.selected_foods_for_plan)]
     
-    st.subheader("Selected Foods for Your Plan:")
+    st.subheader("Foods Selected for Your Plan:")
     
-    # Display selected foods as small, clean list items or cards
-    for food_item in st.session_state.selected_foods_for_plan:
-        food_row = plan_df[plan_df['Food Item'] == food_item].iloc[0]
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #F8FAFC; border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 0.5rem; border: 1px solid #E2E8F0;">
-            <span style="font-weight: 600; color: #1E293B;">{food_item}</span>
-            <span style="font-size: 0.9rem; color: #64748B;">Score: {food_row['Score (0–10)']}/10</span>
-            {st.button("Remove", key=f"remove_from_plan_{food_item}", args=(food_item,), type="secondary", help=f"Remove {food_item} from plan")}
-        </div>
-        """, unsafe_allow_html=True)
+    # Display selected foods in a clean table format
+    st.dataframe(
+        plan_df[['Food Item', 'Category', 'Score (0–10)', 'Best For', 'Sample Recipe/Usage']],
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Food Item": st.column_config.TextColumn("Food Item", width="medium"),
+            "Category": st.column_config.TextColumn("Category", width="small"),
+            "Score (0–10)": st.column_config.NumberColumn("Score", format="%d", width="small"),
+            "Best For": st.column_config.TextColumn("Benefit for Women", width="medium"),
+            "Sample Recipe/Usage": st.column_config.TextColumn("Usage Idea", width="large"),
+        }
+    )
 
-        if st.session_state.get(f"remove_from_plan_{food_item}"):
-            st.session_state.selected_foods_for_plan.remove(food_item)
-            st.toast(f"'{food_item}' removed from plan. 👋", icon="🗑️")
-            del st.session_state[f"remove_from_plan_{food_item}"]
+    # Allow removing items
+    foods_to_remove = st.multiselect(
+        "Select foods to remove from your plan:",
+        options=st.session_state.selected_foods_for_plan,
+        key='remove_foods_multiselect'
+    )
+    if foods_to_remove:
+        if st.button("Remove Selected Foods", type="secondary"):
+            for food_item in foods_to_remove:
+                if food_item in st.session_state.selected_foods_for_plan:
+                    st.session_state.selected_foods_for_plan.remove(food_item)
+            st.session_state.generated_meal_plan_llm = None # Reset generated plan if foods change
+            st.toast("Foods removed. Plan updated. 👍", icon="✅")
             st.rerun()
 
     st.markdown("---")
 
-    # --- GENERATE MEAL PLAN BUTTON ---
-    if st.button("Generate My Daily Meal Plan", type="primary", use_container_width=True):
-        st.session_state.generated_meal_plan = []
-        # Simple meal plan generation: assign random selected foods/recipes to meals
-        meals = ["Breakfast", "Lunch", "Dinner", "Snack"] # Added Snack
-        
-        # Get all recipe ideas from selected foods, ensure uniqueness if multiple foods have same idea
-        available_recipes = plan_df['Sample Recipe/Usage'].dropna().unique().tolist()
-        
-        if not available_recipes:
-            st.warning("No sample recipes available for your selected foods to generate a meal plan. Try adding foods with recipe suggestions.")
+    # --- GENERATE MEAL PLAN BUTTON (LLM Integration) ---
+    st.subheader("Generate Personalized Meal Plan")
+    st.markdown("<p style='font-size: 1.1rem; color: #475569;'>Click below to get an AI-powered meal plan suggestion based on your selected anti-inflammatory foods.</p>", unsafe_allow_html=True)
+    
+    if st.button("Generate Custom Meal Plan with AI", type="primary", use_container_width=True):
+        if len(st.session_state.selected_foods_for_plan) > 0:
+            with st.spinner("Generating your personalized meal plan... this might take a moment."):
+                google_api_key = st.secrets["GOOGLE_API_KEY"] # Access API key from secrets
+                generated_plan_text = get_gemini_meal_plan(plan_df, google_api_key)
+                st.session_state.generated_meal_plan_llm = generated_plan_text
+            st.toast("Meal plan generated! 🎉", icon="✨")
         else:
-            for meal_time in meals:
-                # Randomly pick a recipe from the available ones
-                if available_recipes:
-                    chosen_recipe = random.choice(available_recipes)
-                    st.session_state.generated_meal_plan.append({
-                        "meal_time": meal_time,
-                        "recipe_idea": chosen_recipe
-                    })
-                else: # Fallback if for some reason available_recipes becomes empty during loop
-                    st.session_state.generated_meal_plan.append({
-                        "meal_time": meal_time,
-                        "recipe_idea": "No suitable recipe idea available for this meal."
-                    })
-            st.toast("Meal plan generated! 🥗✨", icon="🎉")
+            st.warning("Please add some foods to your plan first to generate a meal plan!")
         st.rerun() # Rerun to display the generated plan
 
     # --- DISPLAY GENERATED MEAL PLAN ---
-    if st.session_state.generated_meal_plan:
-        st.subheader("Your Suggested Daily Plan:")
+    if st.session_state.generated_meal_plan_llm:
+        st.subheader("Your AI-Suggested Daily Plan:")
         st.markdown('<div class="meal-plan-section">', unsafe_allow_html=True)
-        for meal in st.session_state.generated_meal_plan:
-            st.markdown(f"""
-            <div class="meal-plan-item">
-                <h4 style="color: #0d9488; margin-bottom: 0.5rem; font-size: 1.3rem;">{meal['meal_time']}</h4>
-                <p style="color: #475569; font-size: 1rem;">{meal['recipe_idea']}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(st.session_state.generated_meal_plan_llm) # LLM output is already Markdown
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("---")
         
-        # Combined Plan Insights: Nutrients and Cautions
-        insight_cols = st.columns(2)
-        with insight_cols[0]:
-            st.subheader("Nutrients Covered:")
-            nutrients = set()
-            for val in plan_df['Key Vitamins & Minerals']:
-                if pd.notna(val):
-                    for n in str(val).split(','):
-                        nutrients.add(n.strip())
-            if nutrients:
-                st.write(", ".join(sorted(nutrients)))
-            else:
-                st.info("No specific nutrients listed for selected foods.")
-
-        with insight_cols[1]:
-            st.subheader("Important Cautions:")
-            cautions = set()
-            for val in plan_df['Cautions']:
-                if pd.notna(val) and val.strip() != "None specific." and val.strip() != "":
-                    cautions.add(val.strip())
-            if cautions:
-                for caution in sorted(cautions):
-                    st.warning(f"⚠️ {caution}")
-            else:
-                st.info("No major cautions listed for the selected foods. Always consult a healthcare professional.")
-
         # --- COPY TO CLIPBOARD BUTTON ---
-        plan_text = "Your Daily Meal Plan Suggestion (from NourishWell):\n\n"
-        for meal in st.session_state.generated_meal_plan:
-            plan_text += f"{meal['meal_time']}: {meal['recipe_idea']}\n"
-        plan_text += "\n--- Always consult a healthcare professional before making significant dietary changes. ---"
+        copy_text_area = st.text_area("Copyable Plan Text:", st.session_state.generated_meal_plan_llm, height=200, label_visibility="collapsed")
         
+        copy_button_label = "Copy Plan to Clipboard"
         st.markdown(
             f"""
-            <button 
-                onclick="navigator.clipboard.writeText(`{plan_text.replace('`', '\\`')}`); alert('Meal plan copied to clipboard!');"
+            <button
+                onclick="navigator.clipboard.writeText(`{copy_text_area.replace('`', '\\`')}`); alert('Meal plan copied to clipboard!');"
                 style="
                     background-color: #10B981; /* Green-500 */
                     color: white;
-                    border-radius: 0.75rem;
+                    border-radius: 0.5rem;
                     padding: 0.75rem 1.25rem;
                     font-weight: 600;
                     transition: all 0.2s ease-in-out;
@@ -338,7 +280,7 @@ else:
                     width: 100%;
                 "
             >
-                Copy Plan to Clipboard
+                {copy_button_label}
             </button>
             """,
             unsafe_allow_html=True
