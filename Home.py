@@ -63,54 +63,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* Food card specific styling for Food Discovery page */
-    .food-card {
-        background-color: white;
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: all 0.2s ease-in-out;
-        margin-bottom: 1.5rem;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border: 1px solid #f0f4f8;
-    }
-    .food-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 15px rgba(0,0,0,0.1);
-    }
-    .food-card-score {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #0d9488;
-        text-align: right;
-        line-height: 1;
-    }
-    .food-card-name {
-        font-size: 1.625rem;
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 0.5rem;
-    }
-    .food-card-category {
-        font-size: 0.875rem;
-        color: #64748B;
-        margin-top: 0.25rem;
-        font-weight: 500;
-    }
-    .food-card-buttons {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.5rem;
-        justify-content: space-between;
-    }
-    .food-card-buttons button {
-        flex-grow: 1;
-    }
-
-    /* Detail Card styling (simulated modal) for Food Discovery page */
+    /* Food card specific styling (minimal, mainly for Detail Modal) */
     .detail-card {
         background-color: white;
         border-radius: 0.75rem;
@@ -150,7 +103,7 @@ st.markdown("""
         border: 1px solid #10B981;
     }
 
-    /* Meal Plan Section styling for Meal Plan page */
+    /* Meal Plan Section styling */
     .meal-plan-section {
         background-color: white;
         border-radius: 0.75rem;
@@ -194,9 +147,12 @@ st.markdown("""
         line-height: 1.4;
     }
 
-    /* Ensure specific Streamlit elements blend */
-    .stMultiSelect, .stSlider {
-        margin-bottom: 1rem;
+    /* Streamlit widgets for consistent look */
+    .stMultiSelect, .stSlider, .stTextInput {
+        margin-bottom: 0.5rem;
+    }
+    .stSelectbox div[data-baseweb="select"] {
+        border-radius: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
