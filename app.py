@@ -203,19 +203,13 @@ else:
 
     for index, food in filtered_df.iterrows():
         with cols[index % 3]: # Cycle through the columns for distribution
-            why_anti_inflammatory_snippet = ""
-            # --- Check if 'Why Anti-Inflammatory' column exists before accessing ---
-            if 'Why Anti-Inflammatory' in food.index:
-                # Get the first sentence of "Why Anti-Inflammatory"
-                snippet_text = food['Why Anti-Inflammatory'].split('. ')[0]
-                # Add a period if the snippet exists and doesn't already end with one.
-                if snippet_text.strip() and not snippet_text.strip().endswith('.'):
-                    why_anti_inflammatory_snippet = snippet_text + '.'
-                else:
-                    why_anti_inflammatory_snippet = snippet_text
-            else:
-                why_anti_inflammatory_snippet = "No anti-inflammatory explanation available."
+            # --- CORRECTED: Use .get() for safer access to 'Why Anti-Inflammatory' ---
+            why_anti_inflammatory_full = food.get('Why Anti-Inflammatory', 'No anti-inflammatory explanation available.')
+            why_anti_inflammatory_snippet = why_anti_inflammatory_full.split('. ')[0]
 
+            # Add a period if the snippet exists and doesn't already end with one.
+            if why_anti_inflammatory_snippet.strip() and not why_anti_inflammatory_snippet.strip().endswith('.'):
+                why_anti_inflammatory_snippet += '.'
 
             st.markdown(f"""
             <div class="food-card">
@@ -263,15 +257,18 @@ if st.session_state.detailed_food_id:
             <h3>{detailed_food['Food Item']}</h3>
             {st.button("Close Details", key="close_details")}
         </div>
-        <p class="text-sm text-gray-500">{detailed_food['Category']} > {detailed_food['Sub-category']}</p>
+        {/* --- Use .get() for 'Sub-category' as well, in case it's missing for some rows --- */}
+        <p class="text-sm text-gray-500">{detailed_food['Category']} > {detailed_food.get('Sub-category', 'N/A')}</p>
         <div class="detail-item-title">Anti-Inflammatory Mechanism for Women:</div>
-        <div class="detail-item-content">{detailed_food['Why Anti-Inflammatory'] if 'Why Anti-Inflammatory' in detailed_food.index else 'N/A'}</div>
+        {/* --- Use .get() for 'Why Anti-Inflammatory' --- */}
+        <div class="detail-item-content">{detailed_food.get('Why Anti-Inflammatory', 'N/A')}</div>
         <div class="detail-item-title">Key Vitamins & Minerals:</div>
         <div class="detail-item-content">{detailed_food['Key Vitamins & Minerals']}</div>
         <div class="detail-item-title">Best Type/Form:</div>
         <div class="detail-item-content">{detailed_food['Best Type/Form']}</div>
         <div class="detail-item-title">Anti-Inflammatory Score:</div>
-        <div class="detail-item-content">{detailed_food['Score (0–10)']}/10 (Justification: {detailed_food.get('Score Justification', 'N/A')})</div>
+        {/* --- Check for 'Score Justification' using .get() --- */}
+        <div class="detail-item-content">{detailed_food['Score (0–10)']}/10 (Justification: {detailed_food.get('Score Justification', 'No justification available.')})</div>
         <div class="detail-item-title">Best For:</div>
         <div class="detail-item-content">{detailed_food['Best For']}</div>
         <div class="detail-item-title">Beneficial For:</div>
