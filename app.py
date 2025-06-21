@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# Safely load the CSV file with correct encoding
+# Try multiple encodings for robust CSV loading
 try:
     df = pd.read_csv('anti_inflammatory_foods.csv', encoding='utf-8-sig')
 except UnicodeDecodeError:
@@ -16,7 +16,8 @@ Select the foods you like to build a custom plan with tailored recipe ideas!
 
 # Sidebar filters
 categories = df['Category'].dropna().unique()
-flags = sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in row.split(',') if flag.strip()})
+# Pull unique flags, handle blanks
+flags = sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in str(row).split(',') if flag.strip()})
 
 selected_category = st.sidebar.multiselect("Filter by Food Category", categories)
 selected_flags = st.sidebar.multiselect("Filter by Health Issue", flags)
@@ -26,7 +27,7 @@ if selected_category:
     filtered = filtered[filtered['Category'].isin(selected_category)]
 if selected_flags:
     filtered = filtered[filtered['Flags (Female Health Issues)'].apply(
-        lambda x: any(flag in x for flag in selected_flags) if pd.notna(x) else False
+        lambda x: any(flag in str(x) for flag in selected_flags) if pd.notna(x) else False
     )]
 
 st.subheader("Explore Foods")
@@ -49,7 +50,7 @@ if selected_foods:
     nutrients = set()
     for val in plan['Key Vitamins & Minerals']:
         if pd.notna(val):
-            for n in val.split(','):
+            for n in str(val).split(','):
                 nutrients.add(n.strip())
     st.write(", ".join(sorted(nutrients)))
 
