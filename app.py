@@ -161,7 +161,7 @@ st.markdown("Start by selecting your primary health focus or browse by food cate
 st.sidebar.header("Filter Options")
 
 all_categories = df['Category'].dropna().unique()
-# --- Use the exact column name 'Flags (Female Health Issues)' from CSV ---
+# Use the exact column name 'Flags (Female Health Issues)' from CSV
 all_flags = sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in str(row).split(',') if flag.strip()})
 
 selected_categories_filter = st.sidebar.multiselect(
@@ -183,7 +183,7 @@ if selected_categories_filter:
     filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories_filter)]
 
 if selected_flags_filter:
-    # --- Use the exact column name 'Flags (Female Health Issues)' from CSV ---
+    # Use the exact column name 'Flags (Female Health Issues)' from CSV
     filtered_df = filtered_df[filtered_df['Flags (Female Health Issues)'].apply(
         lambda x: any(flag in str(x) for flag in selected_flags_filter) if pd.notna(x) else False
     )]
@@ -203,7 +203,6 @@ else:
 
     for index, food in filtered_df.iterrows():
         with cols[index % 3]: # Cycle through the columns for distribution
-            # --- CORRECTED: Use .get() for safer access to 'Why Anti-Inflammatory' ---
             why_anti_inflammatory_full = food.get('Why Anti-Inflammatory', 'No anti-inflammatory explanation available.')
             why_anti_inflammatory_snippet = why_anti_inflammatory_full.split('. ')[0]
 
@@ -257,17 +256,14 @@ if st.session_state.detailed_food_id:
             <h3>{detailed_food['Food Item']}</h3>
             {st.button("Close Details", key="close_details")}
         </div>
-        {/* --- Use .get() for 'Sub-category' as well, in case it's missing for some rows --- */}
         <p class="text-sm text-gray-500">{detailed_food['Category']} > {detailed_food.get('Sub-category', 'N/A')}</p>
         <div class="detail-item-title">Anti-Inflammatory Mechanism for Women:</div>
-        {/* --- Use .get() for 'Why Anti-Inflammatory' --- */}
         <div class="detail-item-content">{detailed_food.get('Why Anti-Inflammatory', 'N/A')}</div>
         <div class="detail-item-title">Key Vitamins & Minerals:</div>
         <div class="detail-item-content">{detailed_food['Key Vitamins & Minerals']}</div>
         <div class="detail-item-title">Best Type/Form:</div>
         <div class="detail-item-content">{detailed_food['Best Type/Form']}</div>
         <div class="detail-item-title">Anti-Inflammatory Score:</div>
-        {/* --- Check for 'Score Justification' using .get() --- */}
         <div class="detail-item-content">{detailed_food['Score (0–10)']}/10 (Justification: {detailed_food.get('Score Justification', 'No justification available.')})</div>
         <div class="detail-item-title">Best For:</div>
         <div class="detail-item-content">{detailed_food['Best For']}</div>
