@@ -16,7 +16,7 @@ Select the foods you like to build a custom plan with tailored recipe ideas!
 
 # Sidebar filters
 categories = df['Category'].dropna().unique()
-# --- CORRECTED: Use 'Flags' as per your CSV header ---
+# --- Using 'Flags' as per your CSV header image. Please ensure this is EXACTLY how it appears in your CSV. ---
 flags = sorted({flag.strip() for row in df['Flags'].dropna() for flag in str(row).split(',') if flag.strip()})
 
 selected_category = st.sidebar.multiselect("Filter by Food Category", categories)
@@ -26,14 +26,14 @@ filtered = df.copy()
 if selected_category:
     filtered = filtered[filtered['Category'].isin(selected_category)]
 if selected_flags:
-    # --- CORRECTED: Use 'Flags' as per your CSV header ---
+    # --- Using 'Flags' as per your CSV header image ---
     filtered = filtered[filtered['Flags'].apply(
         lambda x: any(flag in str(x) for flag in selected_flags) if pd.notna(x) else False
     )]
 
 st.subheader("Explore Foods")
 st.dataframe(
-    # --- CORRECTED: Use 'Score' and 'Flags' as per your CSV headers ---
+    # --- Using 'Score' and 'Flags' as per your CSV header image ---
     filtered[['Food Item', 'Category', 'Score', 'Best For', 'Flags', 'Sample Recipe/Usage']],
     use_container_width=True
 )
@@ -43,7 +43,8 @@ selected_foods = st.multiselect("Choose foods for your custom plan:", filtered['
 if selected_foods:
     st.header("Your Custom Anti-Inflammatory Plan")
     plan = filtered[filtered['Food Item'].isin(selected_foods)]
-    st.dataframe(plan[['Food Item', 'Best Type/Form', 'Sample Recipe/Usage', 'Key Vitamins & Minerals', 'Score', 'Cautions']], use_container_width=True) # --- CORRECTED: Use 'Score'
+    # --- Using 'Score' as per your CSV header image ---
+    st.dataframe(plan[['Food Item', 'Best Type/Form', 'Sample Recipe/Usage', 'Key Vitamins & Minerals', 'Score', 'Cautions']], use_container_width=True)
     st.write("**Recipe ideas from your selected foods:**")
     for _, row in plan.iterrows():
         st.markdown(f"- **{row['Food Item']}**: {row['Sample Recipe/Usage']}")
