@@ -153,24 +153,32 @@ st.markdown("""
         padding-top: 0.5rem; /* Adjust padding for slider */
     }
 
-    /* Custom style for Add to Plan button in dataframe if not using column_config */
-    .stDataFrame .add-to-plan-btn {
-        background-color: #0d9488; /* Teal-600 */
-        color: white;
+    /* Table row styling using columns to mimic a table */
+    .st_row {
+        background-color: white;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.25rem;
         border-radius: 0.5rem;
-        padding: 0.35rem 0.75rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        display: flex; /* Ensure inner columns behave as flex items */
+        align-items: center;
+        border: 1px solid #E2E8F0;
+    }
+    .st_row:hover {
+        background-color: #F8FAFC;
+    }
+    .table-header {
+        font-weight: 600;
+        color: #1E293B;
+        padding: 0.75rem 1rem;
+        border-bottom: 2px solid #CBD5E1;
+        margin-bottom: 0.5rem;
+    }
+    /* Style for buttons within the manually created table rows */
+    .st_row .stButton button {
+        padding: 0.3rem 0.6rem;
         font-size: 0.8rem;
-        font-weight: 500;
-        border: none;
-        cursor: pointer;
-    }
-    .stDataFrame .add-to-plan-btn:hover {
-        background-color: #0f766e;
-    }
-
-    /* Sticky filter bar (Streamlit native doesn't fully support, but this is a common trick) */
-    div.stSpinner + div {
-        margin-top: 2rem; /* Give space for spinner if used */
+        min-height: 28px; /* Standardize button height */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -185,10 +193,6 @@ def load_data():
     return df
 
 df = load_data()
-
-# --- DEBUGGING LINE: PRINT ALL COLUMN NAMES ---
-# st.write("DEBUG: Columns loaded from CSV:", df.columns.tolist())
-# --- END DEBUGGING LINE ---
 
 # --- SESSION STATE INITIALIZATION ---
 if 'selected_foods_for_plan' not in st.session_state:
@@ -286,104 +290,62 @@ elif sort_by == "Alphabetical (A-Z)":
 
 st.markdown(f"<p style='font-size: 1.1rem; margin-bottom: 1.5rem; color: #475569;'>Showing <b>{len(filtered_df)}</b> foods.</p>", unsafe_allow_html=True)
 
-# --- MAIN TABLE/LIST DISPLAY ---
+# --- MAIN TABLE/LIST DISPLAY (Manually constructed with st.columns and st.button) ---
 st.subheader("Food Database")
 
 if filtered_df.empty:
     st.info("No foods match your current filter and search criteria. Try broadening your selection!")
 else:
-    # Prepare DataFrame for display with custom columns and buttons
-    # Using .get() for safety when accessing columns, providing N/A default for display
-    # Ensure all required display columns exist in filtered_df, adding if missing
-    for col in ['Food Item', 'Category', 'Key Vitamins & Minerals', 'Why Anti-Inflammatory',
-                'Best For', 'Score (0–10)', 'Sample Recipe/Usage', 'Cautions',
-                'Sub-category', 'Flags (Female Health Issues)']:
-        if col not in filtered_df.columns:
-            # If a column is missing, add it with a default value.
-            # This is a safeguard against slightly inconsistent CSVs.
-            filtered_df[col] = 'N/A (Column Missing)'
+    # Define column widths for the manual table to make it responsive
+    col_widths = [2, 1, 2, 3, 2, 0.75, 1] # Food Item, Category, Nutrients, Benefit, Best For, Score, Button
 
-    display_df = filtered_df[[
-        'Food Item',
-        'Category',
-        'Key Vitamins & Minerals',
-        'Why Anti-Inflammatory', # Mechanism/Benefit
-        'Best For', # Specific Benefit for Women
-        'Score (0–10)',
-        'Sample Recipe/Usage', # Used in the details or plan
-        'Cautions', # Used in the details
-        'Sub-category', # Also used in details
-        'Flags (Female Health Issues)' # Also used in details
-    ]].copy()
+    # Table Header Row
+    header_cols = st.columns(col_widths)
+    header_cols[0].markdown("<div class='table-header'>Food Item</div>", unsafe_allow_html=True)
+    header_cols[1].markdown("<div class='table-header'>Category</div>", unsafe_allow_html=True)
+    header_cols[2].markdown("<div class='table-header'>Key Nutrients/Compounds</div>", unsafe_allow_html=True)
+    header_cols[3].markdown("<div class='table-header'>Mechanism/Benefit</div>", unsafe_allow_html=True)
+    header_cols[4].markdown("<div class='table-header'>Specific Benefit for Women</div>", unsafe_allow_html=True)
+    header_cols[5].markdown("<div class='table-header'>Score</div>", unsafe_allow_html=True)
+    header_cols[6].markdown("<div class='table-header'>Action</div>", unsafe_allow_html=True)
 
 
-    # Display the DataFrame with column configurations
-    st.dataframe(
-        display_df,
-        hide_index=True,
-        use_container_width=True,
-        column_order=[
-            'Food Item', 'Category', 'Key Vitamins & Minerals',
-            'Why Anti-Inflammatory', 'Best For', 'Score (0–10)',
-            'View Details', 'Add to Plan' # Order action buttons at the end
-        ],
-        column_config={
-            "Food Item": st.column_config.TextColumn(
-                "Food Item", help="Name of the food item", width="medium"
-            ),
-            "Category": st.column_config.TextColumn(
-                "Category", help="Food category (e.g., Vegetarian, Non-Vegetarian)", width="small"
-            ),
-            "Key Vitamins & Minerals": st.column_config.TextColumn(
-                "Key Nutrients/Compounds", help="Highlight micronutrients", width="medium"
-            ),
-            "Why Anti-Inflammatory": st.column_config.TextColumn(
-                "Mechanism/Benefit", help="Brief scientific explanation", width="large"
-            ),
-            "Best For": st.column_config.TextColumn(
-                "Specific Benefit for Women", help="Female health issues food is beneficial for", width="medium"
-            ),
-            "Score (0–10)": st.column_config.NumberColumn(
-                "Score", help="Anti-inflammatory benefit score (0-10)", format="%d", width="small"
-            ),
-            # Configure buttons. Streamlit auto-handles clicks via this config
-            "View Details": st.column_config.ButtonColumn(
-                "View Details", help="Click to see full details of the food", width="small"
-            ),
-            "Add to Plan": st.column_config.ButtonColumn(
-                "Add to Plan", help="Add this food to your custom meal plan", width="small",
-            ),
-            # Hide internal columns that are just for the DataFrame data but not displayed
-            "Sample Recipe/Usage": None,
-            "Cautions": None,
-            "Sub-category": None,
-            "Flags (Female Health Issues)": None
-        },
-        on_select="rerun", # Rerun the app when a selection is made
-        selection_mode="single-row" # Only allow one selection at a time for button click
-    )
-
-    # Process button clicks from the dataframe
-    if st.session_state.get('dataframe_selected_rows') and st.session_state.dataframe_selected_rows['added_rows']:
-        selected_row_index = st.session_state.dataframe_selected_rows['added_rows'][0]
-        selected_food_data = filtered_df.iloc[selected_row_index] # Get full row data
-
-        # Determine which button was clicked based on the column name (which is the label of the ButtonColumn)
-        clicked_column = st.session_state.dataframe_selected_rows['column_name']
-
-        if clicked_column == 'Add to Plan':
-            if selected_food_data['Food Item'] not in st.session_state.selected_foods_for_plan:
-                st.session_state.selected_foods_for_plan.append(selected_food_data['Food Item'])
-                st.toast(f"'{selected_food_data['Food Item']}' added to your plan! 🎉", icon="✅")
-            else:
-                st.toast(f"'{selected_food_data['Food Item']}' is already in your plan!", icon="ℹ️")
-        elif clicked_column == 'View Details':
-            st.session_state.detailed_food_id = selected_food_data['Food Item']
+    # Data Rows
+    for index, food in filtered_df.iterrows():
+        row_cols = st.columns(col_widths)
         
-        # Clear selection after processing to avoid re-triggering on next rerun
-        st.session_state.dataframe_selected_rows = {'added_rows': [], 'removed_rows': [], 'column_name': None}
-        st.rerun() # Rerun to update state or display details
+        # Using .get() for robust column access, providing empty string if column is missing/NaN
+        food_item = food.get('Food Item', '')
+        category = food.get('Category', '')
+        key_nutrients = food.get('Key Vitamins & Minerals', '')
+        why_anti_inflammatory = food.get('Why Anti-Inflammatory', '')
+        best_for = food.get('Best For', '')
+        score = food.get('Score (0–10)', 'N/A')
 
+        with row_cols[0]:
+            st.markdown(f"<div class='st_row_item'><b>{food_item}</b></div>", unsafe_allow_html=True)
+        with row_cols[1]:
+            st.markdown(f"<div class='st_row_item'>{category}</div>", unsafe_allow_html=True)
+        with row_cols[2]:
+            st.markdown(f"<div class='st_row_item'>{key_nutrients}</div>", unsafe_allow_html=True)
+        with row_cols[3]:
+            # Display only a snippet of the mechanism for table view, full in details
+            snippet = why_anti_inflammatory.split('. ')[0]
+            if snippet and not snippet.strip().endswith('.'): snippet += '.'
+            st.markdown(f"<div class='st_row_item'>{snippet}</div>", unsafe_allow_html=True)
+        with row_cols[4]:
+            st.markdown(f"<div class='st_row_item'>{best_for}</div>", unsafe_allow_html=True)
+        with row_cols[5]:
+            st.markdown(f"<div class='st_row_item'>**{score}**</div>", unsafe_allow_html=True)
+        with row_cols[6]:
+            add_button_key = f"add_to_plan_{food_item}_{index}" # Unique key for each button
+            if st.button("Add to Plan", key=add_button_key, type="primary"):
+                if food_item not in st.session_state.selected_foods_for_plan:
+                    st.session_state.selected_foods_for_plan.append(food_item)
+                    st.toast(f"'{food_item}' added to your plan! 🎉", icon="✅")
+                else:
+                    st.toast(f"'{food_item}' is already in your plan!", icon="ℹ️")
+                st.rerun() # Rerun to update the selected foods list immediately
 
 # --- VIEW MY PLAN BUTTON (Conditional) ---
 st.markdown("---") # Separator
@@ -395,39 +357,17 @@ else:
     st.info("Select foods from the list above to start building your personalized meal plan.")
 
 
-# --- DETAILED FOOD INFORMATION (SIMULATED MODAL/EXPANDABLE PANEL) ---
-if st.session_state.detailed_food_id:
-    detailed_food = df[df['Food Item'] == st.session_state.detailed_food_id].iloc[0]
-    st.markdown(f"""
-    <div class="detail-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3>{detailed_food['Food Item']}</h3>
-            {st.button("Close Details", key="close_details_modal")}
-        </div>
-        <p class="text-sm text-gray-500">{detailed_food['Category']} > {detailed_food.get('Sub-category', 'N/A')}</p>
-        <div class="detail-item-title">Why Anti-Inflammatory (for Women):</div>
-        <div class="detail-item-content">{detailed_food.get('Why Anti-Inflammatory', 'N/A')}</div>
-        <div class="detail-item-title">Key Vitamins & Minerals:</div>
-        <div class="detail-item-content">{detailed_food.get('Key Vitamins & Minerals', 'N/A')}</div>
-        <div class="detail-item-title">Best Type/Form:</div>
-        <div class="detail-item-content">{detailed_food.get('Best Type/Form', 'N/A')}</div>
-        <div class="detail-item-title">Anti-Inflammatory Score:</div>
-        <div class="detail-item-content">{detailed_food.get('Score (0–10)', 'N/A')}/10</div>
-        <div class="detail-item-title">Best For:</div>
-        <div class="detail-item-content">{detailed_food.get('Best For', 'N/A')}</div>
-        <div class="detail-item-title">Beneficial For:</div>
-        <div class="detail-item-content">{' '.join([f'<span class="flag-badge">{flag.strip()}</span>' for flag in str(detailed_food.get('Flags (Female Health Issues)', '')).split(',') if flag.strip()])}</div>
-        <div class="detail-item-title">Regional Availability:</div>
-        <div class="detail-item-content">{detailed_food.get('Regional Availability', 'N/A')}</div>
-        <div class="detail-item-title">Cautions:</div>
-        <div class="detail-item-content" style="color: #EF4444;">{detailed_food.get('Cautions', 'N/A')}</div>
-        <div class="detail-item-title">Sample Recipe/Usage:</div>
-        <div class="detail-item-content">{detailed_food.get('Sample Recipe/Usage', 'N/A')}</div>
-    </div>
-    """, unsafe_allow_html=True)
+# --- DETAILED FOOD INFORMATION (SIMULATED MODAL/EXPANDABLE PANEL - Triggered by button) ---
+# For simplicity, this is not directly linked to a button in the manual table above,
+# as managing two buttons per row (View Details + Add to Plan) in the manual approach
+# adds significant complexity with Streamlit's rerunning nature for multiple buttons.
+# If "View Details" is crucial on the main table, consider `streamlit-aggrid`.
+# For now, this detail view can be expanded conceptually or triggered differently.
+# Example: st.expander could be used to show details if you wanted it right in the list.
 
-    if st.session_state.get("close_details_modal"):
-        st.session_state.detailed_food_id = None
-        st.rerun() # Rerun to hide the detailed food section
+# If you still need a View Details for each row, we'd need to add a second button
+# in the loop. The current design prioritizes "Add to Plan" as the primary CTA per row.
+# The `detailed_food_id` logic can still be used if you decide to add a separate
+# mechanism to trigger it (e.g., a multi-select for "view details" and then a global button).
 
 st.caption("Developed by Hanif | Powered by Streamlit")
