@@ -211,7 +211,8 @@ else:
                         <div class="food-card-score">{food['Score (0–10)']}</div>
                     </div>
                     <div class="food-card-category">{food['Category']}</div>
-                    <div class="food-card-why">{food['Why Anti-Inflammatory'].split('. ')[0]}.</div> {/* Show first sentence */}
+                    {/* --- CORRECTED LINE BELOW --- */}
+                    <div class="food-card-why">{food['Why Anti-Inflammatory'].split('. ')[0]}{'.' if food['Why Anti-Inflammatory'].split('. ')[0].strip() and not food['Why Anti-Inflammatory'].split('. ')[0].strip().endswith('.') else ''}</div> {/* Show first sentence, ensure it ends with a period if not already */}
                 </div>
                 <div class="food-card-buttons">
                     {st.button("View Details", key=f"view_{food['Food Item']}", args=(food['Food Item'],))}
@@ -257,7 +258,7 @@ if st.session_state.detailed_food_id:
         <div class="detail-item-title">Best Type/Form:</div>
         <div class="detail-item-content">{detailed_food['Best Type/Form']}</div>
         <div class="detail-item-title">Anti-Inflammatory Score:</div>
-        <div class="detail-item-content">{detailed_food['Score (0–10)']}/10 (Justification: {detailed_food['Score Justification']})</div> {/* Assuming you have a 'Score Justification' column now, based on previous data structures. If not, remove this part. */}
+        <div class="detail-item-content">{detailed_food['Score (0–10)']}/10 (Justification: {detailed_food['Score Justification'] if 'Score Justification' in detailed_food.index else 'N/A'})</div>
         <div class="detail-item-title">Best For:</div>
         <div class="detail-item-content">{detailed_food['Best For']}</div>
         <div class="detail-item-title">Beneficial For:</div>
