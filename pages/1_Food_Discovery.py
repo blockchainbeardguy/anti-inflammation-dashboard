@@ -45,7 +45,7 @@ st.markdown("""
     }
     .stButton>button:active {
         transform: translateY(0);
-        box_shadow: none;
+        box-shadow: none;
     }
 
     /* Secondary button style (e.g., View Details, Reset) */
@@ -59,7 +59,7 @@ st.markdown("""
         background-color: #cbd5e1; /* Slate-300 */
         color: #1e293b; /* Slate-900 */
         transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box_shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
     /* Detail Card styling (simulated modal) */
@@ -187,7 +187,7 @@ def load_data():
 df = load_data()
 
 # --- DEBUGGING LINE: PRINT ALL COLUMN NAMES ---
-st.write("DEBUG: Columns loaded from CSV:", df.columns.tolist())
+# st.write("DEBUG: Columns loaded from CSV:", df.columns.tolist())
 # --- END DEBUGGING LINE ---
 
 # --- SESSION STATE INITIALIZATION ---
@@ -268,10 +268,10 @@ if search_term:
     # Apply search across relevant text columns using .get() for safety
     filtered_df = filtered_df[
         filtered_df.apply(lambda row:
-            (row.get('Food Item', '').lower().find(search_term_lower) != -1) or
-            (row.get('Why Anti-Inflammatory', '').lower().find(search_term_lower) != -1) or
-            (row.get('Key Vitamins & Minerals', '').lower().find(search_term_lower) != -1) or
-            (row.get('Flags (Female Health Issues)', '').lower().find(search_term_lower) != -1),
+            (str(row.get('Food Item', '')).lower().find(search_term_lower) != -1) or
+            (str(row.get('Why Anti-Inflammatory', '')).lower().find(search_term_lower) != -1) or
+            (str(row.get('Key Vitamins & Minerals', '')).lower().find(search_term_lower) != -1) or
+            (str(row.get('Flags (Female Health Issues)', '')).lower().find(search_term_lower) != -1),
         axis=1)
     ]
 
@@ -294,17 +294,27 @@ if filtered_df.empty:
 else:
     # Prepare DataFrame for display with custom columns and buttons
     # Using .get() for safety when accessing columns, providing N/A default for display
-    display_df = pd.DataFrame({
-        'Food Item': filtered_df['Food Item'],
-        'Category': filtered_df['Category'],
-        'Key Nutrients/Compounds': filtered_df.get('Key Vitamins & Minerals', 'N/A'),
-        'Mechanism/Benefit': filtered_df.get('Why Anti-Inflammatory', 'N/A'),
-        'Specific Benefit for Women': filtered_df.get('Best For', 'N/A'),
-        'Anti-Inflammation Score': filtered_df['Score (0–10)'],
-        # These are for internal use by the buttons, not directly displayed as column data
-        'Sample Recipe/Usage_hidden': filtered_df.get('Sample Recipe/Usage', 'N/A'),
-        'Cautions_hidden': filtered_df.get('Cautions', 'N/A')
-    })
+    # The columns for the dataframe must exist in the dataframe itself.
+    # We will ensure all necessary columns are present, using .get() with default values
+    # if they happen to be entirely missing from the loaded CSV.
+
+    # Ensure all required display columns exist in filtered_df, adding if missing
+    for col in ['Food Item', 'Category', 'Key Vitamins & Minerals', 'Why Anti-Inflammatory',
+                'Best For', 'Score (0–10)', 'Sample Recipe/Usage', 'Cautions',
+                'Sub-category', 'Flags (Female Health Issues)']:
+        if col not in filtered_df.columns:
+            filtered_df[col] = 'N/A (Column Missing)' # Add a placeholder column if not found
+
+    display_df = filtered_df[[
+        'Food Item',
+        'Category',
+        'Key Vitamins & Minerals',
+        'Why Anti-Inflammatory', # Mechanism/Benefit
+        'Best For', # Specific Benefit for Women
+        'Score (0–10)',
+        'Sample Recipe/Usage', # Used in the details or plan
+        'Cautions' # Used in the details
+    ]].copy()
 
     # Add dummy columns for action buttons which will trigger Streamlit's internal button handling
     display_df['View Details'] = 'View Details'
@@ -316,37 +326,39 @@ else:
         hide_index=True,
         use_container_width=True,
         column_order=[
-            'Food Item', 'Category', 'Key Nutrients/Compounds',
-            'Mechanism/Benefit', 'Specific Benefit for Women', 'Anti-Inflammation Score',
+            'Food Item', 'Category', 'Key Vitamins & Minerals',
+            'Why Anti-Inflammatory', 'Best For', 'Score (0–10)',
             'View Details', 'Add to Plan' # Order action buttons at the end
         ],
         column_config={
             "Food Item": st.column_config.TextColumn(
-                "Food Item", width="medium"
+                "Food Item", help="Name of the food item", width="medium"
             ),
             "Category": st.column_config.TextColumn(
-                "Category", width="small"
+                "Category", help="Food category (e.g., Vegetarian, Non-Vegetarian)", width="small"
             ),
-            "Key Nutrients/Compounds": st.column_config.TextColumn(
-                "Key Nutrients/Compounds", width="medium"
+            "Key Vitamins & Minerals": st.column_config.TextColumn(
+                "Key Nutrients/Compounds", help="Highlight micronutrients", width="medium"
             ),
-            "Mechanism/Benefit": st.column_config.TextColumn(
-                "Mechanism/Benefit", width="large"
+            "Why Anti-Inflammatory": st.column_config.TextColumn(
+                "Mechanism/Benefit", help="Brief scientific explanation", width="large"
             ),
-            "Specific Benefit for Women": st.column_config.TextColumn(
-                "Specific Benefit for Women", width="medium"
+            "Best For": st.column_config.TextColumn(
+                "Specific Benefit for Women", help="Female health issues food is beneficial for", width="medium"
             ),
-            "Anti-Inflammation Score": st.column_config.NumberColumn(
-                "Score", format="%d", width="small"
+            "Score (0–10)": st.column_config.NumberColumn(
+                "Score", help="Anti-inflammatory benefit score (0-10)", format="%d", width="small"
             ),
+            # Configure buttons. Streamlit auto-handles clicks via this config
             "View Details": st.column_config.ButtonColumn(
-                "View Details", width="small"
+                "View Details", help="Click to see full details of the food", width="small"
             ),
             "Add to Plan": st.column_config.ButtonColumn(
-                "Add to Plan", width="small"
+                "Add to Plan", help="Add this food to your custom meal plan", width="small",
             ),
-            "Sample Recipe/Usage_hidden": None, # Hide internal columns
-            "Cautions_hidden": None # Hide internal columns
+            # Hide raw Sample Recipe/Usage and Cautions as they are shown in details modal
+            "Sample Recipe/Usage_hidden": None,
+            "Cautions_hidden": None
         },
         on_select="rerun", # Rerun the app when a selection is made
         selection_mode="single-row" # Only allow one selection at a time for button click
@@ -358,13 +370,15 @@ else:
         selected_food_data = filtered_df.iloc[selected_row_index] # Get full row data
 
         # Determine which button was clicked based on the column name (which is the label of the ButtonColumn)
-        if st.session_state.dataframe_selected_rows['column_name'] == 'Add to Plan':
+        clicked_column = st.session_state.dataframe_selected_rows['column_name']
+
+        if clicked_column == 'Add to Plan':
             if selected_food_data['Food Item'] not in st.session_state.selected_foods_for_plan:
                 st.session_state.selected_foods_for_plan.append(selected_food_data['Food Item'])
                 st.toast(f"'{selected_food_data['Food Item']}' added to your plan! 🎉", icon="✅")
             else:
                 st.toast(f"'{selected_food_data['Food Item']}' is already in your plan!", icon="ℹ️")
-        elif st.session_state.dataframe_selected_rows['column_name'] == 'View Details':
+        elif clicked_column == 'View Details':
             st.session_state.detailed_food_id = selected_food_data['Food Item']
         
         # Clear selection after processing to avoid re-triggering on next rerun
