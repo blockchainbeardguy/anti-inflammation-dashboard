@@ -5,7 +5,7 @@ import pandas as pd
 st.set_page_config(
     page_title="NourishWell: Food Discovery",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # No sidebar filters needed here
 )
 
 # --- CUSTOM CSS FOR MODERN UI (Repeated for consistency across pages) ---
@@ -30,8 +30,8 @@ st.markdown("""
     .stButton>button {
         background-color: #0d9488; /* Teal-600 */
         color: white;
-        border-radius: 0.75rem; /* More rounded */
-        padding: 0.75rem 1.25rem; /* Standard padding */
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.25rem;
         font-weight: 600;
         transition: all 0.2s ease-in-out;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -62,68 +62,14 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    /* Food card specific styling for Food Discovery page */
-    .food-card {
-        background-color: white;
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Lighter shadow */
-        transition: all 0.2s ease-in-out;
-        margin-bottom: 1.5rem; /* More space between cards */
-        height: 100%; /* Ensure cards in columns have equal height */
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        border: 1px solid #f0f4f8; /* Light border */
-    }
-    .food-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 15px rgba(0,0,0,0.1); /* Stronger hover shadow */
-    }
-    .food-card-score {
-        font-size: 2.5rem; /* Larger score */
-        font-weight: 700;
-        color: #0d9488; /* Teal-600 */
-        text-align: right;
-        line-height: 1; /* Adjust line height for big number */
-    }
-    .food-card-name {
-        font-size: 1.625rem; /* text-xl to 2xl */
-        font-weight: 700;
-        color: #1E293B;
-        margin-bottom: 0.5rem;
-    }
-    .food-card-category {
-        font-size: 0.875rem; /* text-sm */
-        color: #64748B; /* slate-500 */
-        margin-top: 0.25rem;
-        font-weight: 500;
-    }
-    .food-card-why {
-        font-size: 0.95rem; /* Slightly smaller for snippet */
-        color: #475569; /* slate-600 */
-        margin-top: 1rem;
-        flex-grow: 1;
-        line-height: 1.4;
-    }
-    .food-card-buttons {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.5rem;
-        justify-content: space-between; /* Distribute buttons */
-    }
-    .food-card-buttons button {
-        flex-grow: 1; /* Make buttons fill space */
-    }
-
-    /* Detail Card styling (simulated modal) for Food Discovery page */
+    /* Detail Card styling (simulated modal) */
     .detail-card {
         background-color: white;
         border-radius: 0.75rem;
         padding: 2.5rem;
         box-shadow: 0 8px 16px rgba(0,0,0,0.2);
         margin-top: 2rem;
-        border-left: 6px solid #0d9488; /* Stronger teal accent */
+        border-left: 6px solid #0d9488;
         margin-bottom: 2rem;
     }
     .detail-card h3 {
@@ -156,7 +102,7 @@ st.markdown("""
         border: 1px solid #10B981;
     }
 
-    /* Meal Plan Section styling for Meal Plan page */
+    /* Meal Plan Section styling (for the other page) */
     .meal-plan-section {
         background-color: white;
         border-radius: 0.75rem;
@@ -175,9 +121,56 @@ st.markdown("""
         padding-bottom: 0;
     }
 
-    /* Ensure specific Streamlit elements blend */
-    .stMultiSelect, .stSlider {
-        margin-bottom: 1rem;
+    /* Custom styles for filter bar and data table */
+    .filter-bar-container {
+        background-color: white;
+        padding: 1.25rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+        display: flex; /* Flexbox for horizontal layout */
+        flex-wrap: wrap; /* Allow wrapping on small screens */
+        gap: 1rem; /* Space between filter elements */
+        align-items: center;
+        justify-content: space-between;
+    }
+    .filter-item {
+        flex: 1; /* Distribute space evenly initially */
+        min-width: 150px; /* Minimum width before wrapping */
+    }
+    /* Specific styling for Streamlit widgets to fit the horizontal bar */
+    .stSelectbox div[data-baseweb="select"] {
+        border-radius: 0.5rem;
+        border: 1px solid #E2E8F0;
+        background-color: #F8FAFC;
+    }
+    .stTextInput>div>div>input {
+        border-radius: 0.5rem;
+        border: 1px solid #E2E8F0;
+        background-color: #F8FAFC;
+    }
+    .stSlider .stSliderVertical {
+        padding-top: 0.5rem; /* Adjust padding for slider */
+    }
+
+    /* Custom style for Add to Plan button in dataframe if not using column_config */
+    .stDataFrame .add-to-plan-btn {
+        background-color: #0d9488; /* Teal-600 */
+        color: white;
+        border-radius: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+    }
+    .stDataFrame .add-to-plan-btn:hover {
+        background-color: #0f766e;
+    }
+
+    /* Sticky filter bar (Streamlit native doesn't fully support, but this is a common trick) */
+    div.stSpinner + div {
+        margin-top: 2rem; /* Give space for spinner if used */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -198,135 +191,189 @@ if 'selected_foods_for_plan' not in st.session_state:
     st.session_state.selected_foods_for_plan = []
 if 'detailed_food_id' not in st.session_state:
     st.session_state.detailed_food_id = None
-if 'generated_meal_plan' not in st.session_state:
-    st.session_state.generated_meal_plan = []
 
 
-# --- HEADER ---
-st.title("🌱 Food Discovery")
-st.markdown("Explore a wide range of anti-inflammatory foods. Use the filters in the sidebar to refine your search and click 'Add to Plan' for your favorites.")
+# --- HEADER SECTION ---
+st.title("📊 Anti-Inflammatory Foods Dashboard")
+st.markdown("""
+<p style='font-size: 1.15rem; color: #475569; margin-bottom: 2rem;'>
+    Explore foods that reduce inflammation, categorized and scored for women's health needs.
+</p>
+""", unsafe_allow_html=True)
 
-# --- MAIN CONTENT LAYOUT ---
-# Using columns for main content vs. sidebar filters
-main_content_col, _ = st.columns([1, 0.01]) # Main content takes most space
 
-with main_content_col:
-    # --- Sidebar Filters (Moved to sidebar in this multipage structure) ---
-    with st.sidebar:
-        st.header("🔍 Filter Foods")
-        
-        all_categories = df['Category'].dropna().unique()
-        all_flags = sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in str(row).split(',') if flag.strip()})
+# --- FILTER AND SEARCH BAR (Top of Page, Horizontal Row) ---
+st.subheader("Filter & Search")
 
-        # Using unique keys for persistent filter states across pages
-        selected_categories_filter = st.multiselect(
-            "Food Categories:",
-            options=all_categories,
-            default=st.session_state.get('selected_categories_filter', []),
-            key='selected_categories_filter',
-            help="Select one or more categories to narrow down foods."
-        )
+filter_cols = st.columns([1.5, 1, 1.5, 1, 0.5]) # Adjust column ratios for filter elements
 
-        selected_flags_filter = st.multiselect(
-            "Health Concerns:",
-            options=all_flags,
-            default=st.session_state.get('selected_flags_filter', []),
-            key='selected_flags_filter',
-            help="Choose specific health issues you want to address."
-        )
+all_categories = ['All Categories'] + sorted(df['Category'].dropna().unique().tolist())
+all_health_flags = ['All Concerns'] + sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in str(row).split(',') if flag.strip()})
+sort_options = {"Highest Score": "desc", "Lowest Score": "asc", "Alphabetical (A-Z)": "alpha_asc"}
 
-        min_score_filter = st.slider(
-            "Minimum Anti-Inflammatory Score:",
-            min_value=0,
-            max_value=10,
-            value=st.session_state.get('min_score_filter', 0),
-            key='min_score_filter',
-            help="Only show foods with a score equal to or higher than this value."
-        )
+with filter_cols[0]:
+    selected_category = st.selectbox(
+        "By Category:",
+        options=all_categories,
+        index=0,
+        key='discovery_category_filter'
+    )
+with filter_cols[1]:
+    sort_by = st.selectbox(
+        "Sort By:",
+        options=list(sort_options.keys()),
+        index=0,
+        key='discovery_sort_by'
+    )
+with filter_cols[2]:
+    search_term = st.text_input(
+        "Search Foods:",
+        placeholder="e.g., salmon, magnesium, PCOS",
+        key='discovery_search_term'
+    )
+with filter_cols[3]:
+    min_score = st.slider(
+        "Min Score:",
+        min_value=0,
+        max_value=10,
+        value=0,
+        key='discovery_min_score'
+    )
+with filter_cols[4]:
+    # Placeholder for a reset button, styled to fit the bar
+    if st.button("Reset", key='discovery_reset_filters', type="secondary", help="Clear all filters"):
+        st.session_state.discovery_category_filter = 'All Categories'
+        st.session_state.discovery_sort_by = 'Highest Score'
+        st.session_state.discovery_search_term = ''
+        st.session_state.discovery_min_score = 0
+        st.rerun() # Rerun to apply reset
 
-        if st.button("Reset Filters", type="secondary", use_container_width=True):
-            st.session_state.selected_categories_filter = []
-            st.session_state.selected_flags_filter = []
-            st.session_state.min_score_filter = 0
-            st.session_state.detailed_food_id = None # Also reset detailed view
-            st.rerun() # Use rerun to clear filters visually
 
-    # --- Apply filters ---
-    filtered_df = df.copy()
-    
-    if selected_categories_filter:
-        filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories_filter)]
+# --- APPLY FILTERS ---
+filtered_df = df.copy()
 
-    if selected_flags_filter:
-        filtered_df = filtered_df[filtered_df['Flags (Female Health Issues)'].apply(
-            lambda x: any(flag in str(x) for flag in selected_flags_filter) if pd.notna(x) else False
-        )]
+# Category Filter
+if selected_category != 'All Categories':
+    filtered_df = filtered_df[filtered_df['Category'] == selected_category]
 
-    filtered_df = filtered_df[filtered_df['Score (0–10)'] >= min_score_filter]
+# Minimum Score Filter
+filtered_df = filtered_df[filtered_df['Score (0–10)'] >= min_score]
 
+# Search Filter
+if search_term:
+    search_term_lower = search_term.lower()
+    filtered_df = filtered_df[
+        filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(search_term_lower).any(), axis=1)
+    ]
+
+# Sorting
+if sort_by == "Highest Score":
     filtered_df = filtered_df.sort_values(by='Score (0–10)', ascending=False)
-
-    st.markdown(f"<p style='font-size: 1.1rem; margin-bottom: 1.5rem; color: #475569;'>Found <b>{len(filtered_df)}</b> anti-inflammatory foods matching your criteria.</p>", unsafe_allow_html=True)
-
-    # --- FOOD ITEM DISPLAY (CARDS) ---
-    if filtered_df.empty:
-        st.info("No foods match your current filter selections. Try adjusting your filters!")
-    else:
-        # Create columns for the grid layout
-        food_cols = st.columns(3) # Display 3 cards per row
-
-        for index, food in filtered_df.iterrows():
-            with food_cols[index % 3]: # Cycle through the columns for distribution
-                # Get snippet and ensure it ends with a period
-                why_anti_inflammatory_full = food.get('Why Anti-Inflammatory', '')
-                why_anti_inflammatory_snippet = why_anti_inflammatory_full.split('. ')[0]
-                if why_anti_inflammatory_snippet.strip() and not why_anti_inflammatory_snippet.strip().endswith('.'):
-                    why_anti_inflammatory_snippet += '.'
-
-                st.markdown(f"""
-                <div class="food-card">
-                    <div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div class="food-card-name">{food['Food Item']}</div>
-                            <div class="food-card-score">{food['Score (0–10)']}</div>
-                        </div>
-                        <div class="food-card-category">{food['Category']}</div>
-                        <div class="food-card-why">{why_anti_inflammatory_snippet if why_anti_inflammatory_snippet else 'Brief description not available.'}</div>
-                    </div>
-                    <div class="food-card-buttons">
-                        {st.button("View Details", key=f"view_{food['Food Item']}", args=(food['Food Item'],), type="secondary", use_container_width=True)}
-                        {st.button("Add to Plan", key=f"add_{food['Food Item']}", args=(food['Food Item'],), use_container_width=True)}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Handle button clicks (must be outside the markdown for Streamlit's internal logic)
-                if st.session_state.get(f"view_{food['Food Item']}"):
-                    st.session_state.detailed_food_id = food['Food Item']
-                    # Clear button state after action
-                    del st.session_state[f"view_{food['Food Item']}"]
-                    st.rerun() # Rerun to display the detailed food section
-
-                if st.session_state.get(f"add_{food['Food Item']}"):
-                    if food['Food Item'] not in st.session_state.selected_foods_for_plan:
-                        st.session_state.selected_foods_for_plan.append(food['Food Item'])
-                        st.toast(f"'{food['Food Item']}' added to your plan! 🎉", icon="✅")
-                    else:
-                        st.toast(f"'{food['Food Item']}' is already in your plan!", icon="ℹ️")
-                    # Clear button state after action
-                    del st.session_state[f"add_{food['Food Item']}"]
-                    st.rerun() # Rerun to update the plan button below
+elif sort_by == "Lowest Score":
+    filtered_df = filtered_df.sort_values(by='Score (0–10)', ascending=True)
+elif sort_by == "Alphabetical (A-Z)":
+    filtered_df = filtered_df.sort_values(by='Food Item', ascending=True)
 
 
-    # --- View My Plan Button (Conditional) ---
-    if st.session_state.selected_foods_for_plan:
-        st.markdown("---") # Separator
-        st.subheader("Ready to build your plan?")
-        st.markdown(f"<p style='color: #475569;'>You have <b>{len(st.session_state.selected_foods_for_plan)}</b> foods selected.</p>", unsafe_allow_html=True)
-        # Use a Streamlit native link button to navigate
-        st.page_link("pages/2_Meal_Plan.py", label="View My Plan", icon="➡️")
-    else:
-        st.info("Add some foods to your plan to enable the 'View My Plan' button!")
+st.markdown(f"<p style='font-size: 1.1rem; margin-bottom: 1.5rem; color: #475569;'>Showing <b>{len(filtered_df)}</b> foods.</p>", unsafe_allow_html=True)
+
+# --- MAIN TABLE/LIST DISPLAY ---
+st.subheader("Food Database")
+
+if filtered_df.empty:
+    st.info("No foods match your current filter and search criteria. Try broadening your selection!")
+else:
+    # Prepare DataFrame for display with custom columns and buttons
+    display_df = filtered_df[[
+        'Food Item',
+        'Category',
+        'Key Vitamins & Minerals',
+        'Why Anti-Inflammatory', # Mechanism/Benefit
+        'Best For', # Specific Benefit for Women
+        'Score (0–10)',
+        'Sample Recipe/Usage', # Used in the details or plan
+        'Cautions' # Used in the details
+    ]].copy()
+
+    # Add dummy columns for action buttons which will trigger Streamlit's internal button handling
+    display_df['View Details'] = 'View Details'
+    display_df['Add to Plan'] = 'Add to Plan'
+
+    # Display the DataFrame with column configurations
+    st.dataframe(
+        display_df,
+        hide_index=True,
+        use_container_width=True,
+        column_order=[
+            'Food Item', 'Category', 'Key Vitamins & Minerals',
+            'Why Anti-Inflammatory', 'Best For', 'Score (0–10)',
+            'View Details', 'Add to Plan' # Order action buttons at the end
+        ],
+        column_config={
+            "Food Item": st.column_config.TextColumn(
+                "Food Item", help="Name of the food item", width="medium"
+            ),
+            "Category": st.column_config.TextColumn(
+                "Category", help="Food category (e.g., Vegetarian, Non-Vegetarian)", width="small"
+            ),
+            "Key Vitamins & Minerals": st.column_config.TextColumn(
+                "Key Nutrients", help="Highlight micronutrients", width="medium"
+            ),
+            "Why Anti-Inflammatory": st.column_config.TextColumn(
+                "Mechanism/Benefit", help="Brief scientific explanation", width="large"
+            ),
+            "Best For": st.column_config.TextColumn(
+                "Specific Benefit for Women", help="Female health issues food is beneficial for", width="medium"
+            ),
+            "Score (0–10)": st.column_config.NumberColumn(
+                "Score", help="Anti-inflammatory benefit score (0-10)", format="%d", width="small"
+            ),
+            # Configure buttons. Streamlit auto-handles clicks via this config
+            "View Details": st.column_config.ButtonColumn(
+                "View Details", help="Click to see full details of the food", width="small"
+            ),
+            "Add to Plan": st.column_config.ButtonColumn(
+                "Add to Plan", help="Add this food to your custom meal plan", width="small",
+                # The key must be unique per row, so combine with food item
+                # label_visibility="collapsed" # Hide button text if preferred for compactness
+            ),
+            # Hide raw Sample Recipe/Usage and Cautions as they are shown in details modal
+            "Sample Recipe/Usage": None,
+            "Cautions": None
+        },
+        on_select="rerun", # Rerun the app when a selection is made
+        selection_mode="single-row" # Only allow one selection at a time for button click
+    )
+
+    # Process button clicks from the dataframe
+    if st.session_state.get('dataframe_selected_rows') and st.session_state.dataframe_selected_rows['added_rows']:
+        selected_row_index = st.session_state.dataframe_selected_rows['added_rows'][0]
+        selected_food_name = filtered_df.iloc[selected_row_index]['Food Item']
+
+        # Determine which button was clicked based on the column name (which is the label of the ButtonColumn)
+        if st.session_state.dataframe_selected_rows['column_name'] == 'Add to Plan':
+            if selected_food_name not in st.session_state.selected_foods_for_plan:
+                st.session_state.selected_foods_for_plan.append(selected_food_name)
+                st.toast(f"'{selected_food_name}' added to your plan! 🎉", icon="✅")
+            else:
+                st.toast(f"'{selected_food_name}' is already in your plan!", icon="ℹ️")
+        elif st.session_state.dataframe_selected_rows['column_name'] == 'View Details':
+            st.session_state.detailed_food_id = selected_food_name
+        
+        # Clear selection after processing to avoid re-triggering on next rerun
+        st.session_state.dataframe_selected_rows = {'added_rows': [], 'removed_rows': [], 'column_name': None}
+        st.rerun() # Rerun to update state or display details
+
+
+# --- VIEW MY PLAN BUTTON (Conditional) ---
+st.markdown("---") # Separator
+if st.session_state.selected_foods_for_plan:
+    st.subheader("Your Meal Plan Awaits!")
+    st.markdown(f"<p style='color: #475569;'>You have <b>{len(st.session_state.selected_foods_for_plan)}</b> foods selected for your plan.</p>", unsafe_allow_html=True)
+    # Use a Streamlit native link button to navigate
+    st.page_link("pages/2_Meal_Plan.py", label="Go to My Meal Plan →", icon="➡️", type="primary")
+else:
+    st.info("Select foods from the list above to start building your personalized meal plan.")
 
 
 # --- DETAILED FOOD INFORMATION (SIMULATED MODAL/EXPANDABLE PANEL) ---
@@ -337,7 +384,7 @@ if st.session_state.detailed_food_id:
     <div class="detail-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3>{detailed_food['Food Item']}</h3>
-            {st.button("Close Details", key="close_details")}
+            {st.button("Close Details", key="close_details_modal")}
         </div>
         <p class="text-sm text-gray-500">{detailed_food['Category']} > {detailed_food.get('Sub-category', 'N/A')}</p>
         <div class="detail-item-title">Why Anti-Inflammatory (for Women):</div>
@@ -361,7 +408,8 @@ if st.session_state.detailed_food_id:
     </div>
     """, unsafe_allow_html=True)
 
-    if st.session_state.get("close_details"):
+    if st.session_state.get("close_details_modal"):
         st.session_state.detailed_food_id = None
-        del st.session_state["close_details"]
         st.rerun() # Rerun to hide the detailed food section
+
+st.caption("Developed by Hanif | Powered by Streamlit")
