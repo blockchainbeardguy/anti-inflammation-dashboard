@@ -45,7 +45,7 @@ st.markdown("""
     }
     .stButton>button:active {
         transform: translateY(0);
-        box-shadow: none;
+        box_shadow: none;
     }
 
     /* Secondary button style (e.g., View Details, Reset) */
@@ -186,6 +186,10 @@ def load_data():
 
 df = load_data()
 
+# --- DEBUGGING LINE: PRINT ALL COLUMN NAMES ---
+st.write("DEBUG: Columns loaded from CSV:", df.columns.tolist())
+# --- END DEBUGGING LINE ---
+
 # --- SESSION STATE INITIALIZATION ---
 if 'selected_foods_for_plan' not in st.session_state:
     st.session_state.selected_foods_for_plan = []
@@ -240,7 +244,6 @@ with filter_cols[3]:
         key='discovery_min_score'
     )
 with filter_cols[4]:
-    # Placeholder for a reset button, styled to fit the bar
     if st.button("Reset", key='discovery_reset_filters', type="secondary", help="Clear all filters"):
         st.session_state.discovery_category_filter = 'All Categories'
         st.session_state.discovery_sort_by = 'Highest Score'
@@ -262,8 +265,14 @@ filtered_df = filtered_df[filtered_df['Score (0–10)'] >= min_score]
 # Search Filter
 if search_term:
     search_term_lower = search_term.lower()
+    # Apply search across relevant text columns using .get() for safety
     filtered_df = filtered_df[
-        filtered_df.apply(lambda row: row.astype(str).str.lower().str.contains(search_term_lower).any(), axis=1)
+        filtered_df.apply(lambda row:
+            (row.get('Food Item', '').lower().find(search_term_lower) != -1) or
+            (row.get('Why Anti-Inflammatory', '').lower().find(search_term_lower) != -1) or
+            (row.get('Key Vitamins & Minerals', '').lower().find(search_term_lower) != -1) or
+            (row.get('Flags (Female Health Issues)', '').lower().find(search_term_lower) != -1),
+        axis=1)
     ]
 
 # Sorting
@@ -284,16 +293,18 @@ if filtered_df.empty:
     st.info("No foods match your current filter and search criteria. Try broadening your selection!")
 else:
     # Prepare DataFrame for display with custom columns and buttons
-    display_df = filtered_df[[
-        'Food Item',
-        'Category',
-        'Key Vitamins & Minerals',
-        'Why Anti-Inflammatory', # Mechanism/Benefit
-        'Best For', # Specific Benefit for Women
-        'Score (0–10)',
-        'Sample Recipe/Usage', # Used in the details or plan
-        'Cautions' # Used in the details
-    ]].copy()
+    # Using .get() for safety when accessing columns, providing N/A default for display
+    display_df = pd.DataFrame({
+        'Food Item': filtered_df['Food Item'],
+        'Category': filtered_df['Category'],
+        'Key Nutrients/Compounds': filtered_df.get('Key Vitamins & Minerals', 'N/A'),
+        'Mechanism/Benefit': filtered_df.get('Why Anti-Inflammatory', 'N/A'),
+        'Specific Benefit for Women': filtered_df.get('Best For', 'N/A'),
+        'Anti-Inflammation Score': filtered_df['Score (0–10)'],
+        # These are for internal use by the buttons, not directly displayed as column data
+        'Sample Recipe/Usage_hidden': filtered_df.get('Sample Recipe/Usage', 'N/A'),
+        'Cautions_hidden': filtered_df.get('Cautions', 'N/A')
+    })
 
     # Add dummy columns for action buttons which will trigger Streamlit's internal button handling
     display_df['View Details'] = 'View Details'
@@ -305,41 +316,37 @@ else:
         hide_index=True,
         use_container_width=True,
         column_order=[
-            'Food Item', 'Category', 'Key Vitamins & Minerals',
-            'Why Anti-Inflammatory', 'Best For', 'Score (0–10)',
+            'Food Item', 'Category', 'Key Nutrients/Compounds',
+            'Mechanism/Benefit', 'Specific Benefit for Women', 'Anti-Inflammation Score',
             'View Details', 'Add to Plan' # Order action buttons at the end
         ],
         column_config={
             "Food Item": st.column_config.TextColumn(
-                "Food Item", help="Name of the food item", width="medium"
+                "Food Item", width="medium"
             ),
             "Category": st.column_config.TextColumn(
-                "Category", help="Food category (e.g., Vegetarian, Non-Vegetarian)", width="small"
+                "Category", width="small"
             ),
-            "Key Vitamins & Minerals": st.column_config.TextColumn(
-                "Key Nutrients", help="Highlight micronutrients", width="medium"
+            "Key Nutrients/Compounds": st.column_config.TextColumn(
+                "Key Nutrients/Compounds", width="medium"
             ),
-            "Why Anti-Inflammatory": st.column_config.TextColumn(
-                "Mechanism/Benefit", help="Brief scientific explanation", width="large"
+            "Mechanism/Benefit": st.column_config.TextColumn(
+                "Mechanism/Benefit", width="large"
             ),
-            "Best For": st.column_config.TextColumn(
-                "Specific Benefit for Women", help="Female health issues food is beneficial for", width="medium"
+            "Specific Benefit for Women": st.column_config.TextColumn(
+                "Specific Benefit for Women", width="medium"
             ),
-            "Score (0–10)": st.column_config.NumberColumn(
-                "Score", help="Anti-inflammatory benefit score (0-10)", format="%d", width="small"
+            "Anti-Inflammation Score": st.column_config.NumberColumn(
+                "Score", format="%d", width="small"
             ),
-            # Configure buttons. Streamlit auto-handles clicks via this config
             "View Details": st.column_config.ButtonColumn(
-                "View Details", help="Click to see full details of the food", width="small"
+                "View Details", width="small"
             ),
             "Add to Plan": st.column_config.ButtonColumn(
-                "Add to Plan", help="Add this food to your custom meal plan", width="small",
-                # The key must be unique per row, so combine with food item
-                # label_visibility="collapsed" # Hide button text if preferred for compactness
+                "Add to Plan", width="small"
             ),
-            # Hide raw Sample Recipe/Usage and Cautions as they are shown in details modal
-            "Sample Recipe/Usage": None,
-            "Cautions": None
+            "Sample Recipe/Usage_hidden": None, # Hide internal columns
+            "Cautions_hidden": None # Hide internal columns
         },
         on_select="rerun", # Rerun the app when a selection is made
         selection_mode="single-row" # Only allow one selection at a time for button click
@@ -348,17 +355,17 @@ else:
     # Process button clicks from the dataframe
     if st.session_state.get('dataframe_selected_rows') and st.session_state.dataframe_selected_rows['added_rows']:
         selected_row_index = st.session_state.dataframe_selected_rows['added_rows'][0]
-        selected_food_name = filtered_df.iloc[selected_row_index]['Food Item']
+        selected_food_data = filtered_df.iloc[selected_row_index] # Get full row data
 
         # Determine which button was clicked based on the column name (which is the label of the ButtonColumn)
         if st.session_state.dataframe_selected_rows['column_name'] == 'Add to Plan':
-            if selected_food_name not in st.session_state.selected_foods_for_plan:
-                st.session_state.selected_foods_for_plan.append(selected_food_name)
-                st.toast(f"'{selected_food_name}' added to your plan! 🎉", icon="✅")
+            if selected_food_data['Food Item'] not in st.session_state.selected_foods_for_plan:
+                st.session_state.selected_foods_for_plan.append(selected_food_data['Food Item'])
+                st.toast(f"'{selected_food_data['Food Item']}' added to your plan! 🎉", icon="✅")
             else:
-                st.toast(f"'{selected_food_name}' is already in your plan!", icon="ℹ️")
+                st.toast(f"'{selected_food_data['Food Item']}' is already in your plan!", icon="ℹ️")
         elif st.session_state.dataframe_selected_rows['column_name'] == 'View Details':
-            st.session_state.detailed_food_id = selected_food_name
+            st.session_state.detailed_food_id = selected_food_data['Food Item']
         
         # Clear selection after processing to avoid re-triggering on next rerun
         st.session_state.dataframe_selected_rows = {'added_rows': [], 'removed_rows': [], 'column_name': None}
@@ -370,14 +377,12 @@ st.markdown("---") # Separator
 if st.session_state.selected_foods_for_plan:
     st.subheader("Your Meal Plan Awaits!")
     st.markdown(f"<p style='color: #475569;'>You have <b>{len(st.session_state.selected_foods_for_plan)}</b> foods selected for your plan.</p>", unsafe_allow_html=True)
-    # Use a Streamlit native link button to navigate
     st.page_link("pages/2_Meal_Plan.py", label="Go to My Meal Plan →", icon="➡️", type="primary")
 else:
     st.info("Select foods from the list above to start building your personalized meal plan.")
 
 
 # --- DETAILED FOOD INFORMATION (SIMULATED MODAL/EXPANDABLE PANEL) ---
-# This section will appear below the food grid when "View Details" is clicked
 if st.session_state.detailed_food_id:
     detailed_food = df[df['Food Item'] == st.session_state.detailed_food_id].iloc[0]
     st.markdown(f"""
@@ -390,21 +395,21 @@ if st.session_state.detailed_food_id:
         <div class="detail-item-title">Why Anti-Inflammatory (for Women):</div>
         <div class="detail-item-content">{detailed_food.get('Why Anti-Inflammatory', 'N/A')}</div>
         <div class="detail-item-title">Key Vitamins & Minerals:</div>
-        <div class="detail-item-content">{detailed_food['Key Vitamins & Minerals']}</div>
+        <div class="detail-item-content">{detailed_food.get('Key Vitamins & Minerals', 'N/A')}</div>
         <div class="detail-item-title">Best Type/Form:</div>
-        <div class="detail-item-content">{detailed_food['Best Type/Form']}</div>
+        <div class="detail-item-content">{detailed_food.get('Best Type/Form', 'N/A')}</div>
         <div class="detail-item-title">Anti-Inflammatory Score:</div>
-        <div class="detail-item-content">{detailed_food['Score (0–10)']}/10</div>
+        <div class="detail-item-content">{detailed_food.get('Score (0–10)', 'N/A')}/10</div>
         <div class="detail-item-title">Best For:</div>
-        <div class="detail-item-content">{detailed_food['Best For']}</div>
+        <div class="detail-item-content">{detailed_food.get('Best For', 'N/A')}</div>
         <div class="detail-item-title">Beneficial For:</div>
-        <div class="detail-item-content">{' '.join([f'<span class="flag-badge">{flag.strip()}</span>' for flag in str(detailed_food['Flags (Female Health Issues)']).split(',') if flag.strip()])}</div>
+        <div class="detail-item-content">{' '.join([f'<span class="flag-badge">{flag.strip()}</span>' for flag in str(detailed_food.get('Flags (Female Health Issues)', '')).split(',') if flag.strip()])}</div>
         <div class="detail-item-title">Regional Availability:</div>
-        <div class="detail-item-content">{detailed_food['Regional Availability']}</div>
+        <div class="detail-item-content">{detailed_food.get('Regional Availability', 'N/A')}</div>
         <div class="detail-item-title">Cautions:</div>
-        <div class="detail-item-content" style="color: #EF4444;">{detailed_food['Cautions']}</div>
+        <div class="detail-item-content" style="color: #EF4444;">{detailed_food.get('Cautions', 'N/A')}</div>
         <div class="detail-item-title">Sample Recipe/Usage:</div>
-        <div class="detail-item-content">{detailed_food['Sample Recipe/Usage']}</div>
+        <div class="detail-item-content">{detailed_food.get('Sample Recipe/Usage', 'N/A')}</div>
     </div>
     """, unsafe_allow_html=True)
 
