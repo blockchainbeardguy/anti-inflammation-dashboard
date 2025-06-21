@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# Try multiple encodings for robust CSV loading
+# Robust CSV loading
 try:
     df = pd.read_csv('anti_inflammatory_foods.csv', encoding='utf-8-sig')
 except UnicodeDecodeError:
@@ -10,13 +10,12 @@ except UnicodeDecodeError:
 st.title("Anti-Inflammatory Foods for Women")
 
 st.markdown("""
-This dashboard helps women explore, filter, and select anti-inflammatory foods based on category and health goals.  
+This dashboard helps women explore, filter, and select anti-inflammatory foods based on category and health goals.
 Select the foods you like to build a custom plan with tailored recipe ideas!
 """)
 
 # Sidebar filters
 categories = df['Category'].dropna().unique()
-# Pull unique flags, handle blanks
 flags = sorted({flag.strip() for row in df['Flags (Female Health Issues)'].dropna() for flag in str(row).split(',') if flag.strip()})
 
 selected_category = st.sidebar.multiselect("Filter by Food Category", categories)
